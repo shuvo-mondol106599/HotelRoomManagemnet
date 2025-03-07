@@ -1,0 +1,177 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import csv
+
+class Restaurant:
+    def __init__(self):
+        self.menu = {}  # Dictionary to store menu items and prices
+        self.order = {}  # Dictionary to store orders
+        self.load_menu_from_csv()
+
+    def load_menu_from_csv(self):
+        try:
+            with open("menu.csv", mode="r", newline="") as file:
+                reader = csv.reader(file)
+                for row in reader:
+                    if len(row) == 2:
+                        item_name, price = row
+                        self.menu[item_name] = float(price)
+        except FileNotFoundError:
+            print("No existing menu file found. Starting with an empty menu.")
+
+    def save_menu_to_csv(self):
+        try:
+            with open("menu.csv", mode="w", newline="") as file:
+                writer = csv.writer(file)
+                for item_name, price in self.menu.items():
+                    writer.writerow([item_name, price])
+        except Exception as e:
+            print(f"Error saving menu to CSV: {e}")
+
+    def add_item(self, item_name, price):
+        if item_name in self.menu:
+            return f"Error: Item '{item_name}' already exists in the menu!"
+        self.menu[item_name] = price
+        self.save_menu_to_csv()
+        return f"Item '{item_name}' added successfully!"
+
+    def remove_item(self, item_name):
+        if item_name in self.menu:
+            del self.menu[item_name]
+            self.save_menu_to_csv()
+            return f"Item '{item_name}' removed successfully!"
+        return f"Error: Item '{item_name}' not found in the menu."
+
+    def update_item_price(self, item_name, new_price):
+        if item_name in self.menu:
+            self.menu[item_name] = new_price
+            self.save_menu_to_csv()
+            return f"Price of '{item_name}' updated successfully!"
+        return f"Error: Item '{item_name}' not found in the menu."
+
+    def view_menu(self):
+        if not self.menu:
+            return "The menu is empty!"
+        return "\n".join([f"{item}: ${price:.2f}" for item, price in self.menu.items()])
+
+    def take_order(self, item_name, quantity):
+        if item_name not in self.menu:
+            return f"Error: '{item_name}' is not available on the menu."
+        if quantity <= 0:
+            return "Error: Quantity must be greater than 0."
+        self.order[item_name] = self.order.get(item_name, 0) + quantity
+        return f"'{item_name}' x {quantity} added to the order."
+
+    def calculate_bill(self):
+        if not self.order:
+            return "No items in the order. Please take an order first."
+        subtotal = sum(self.menu[item] * quantity for item, quantity in self.order.items())
+        tax = subtotal * 0.05
+        service_charge = subtotal * 0.10
+        total = subtotal + tax + service_charge
+
+        bill_text = (
+            "Order Summary:\n"
+            + "\n".join([f"{item} x {quantity} = ${self.menu[item] * quantity:.2f}" for item, quantity in self.order.items()])
+            + f"\n\nSubtotal: ${subtotal:.2f}\n"
+            + f"Tax (5%): ${tax:.2f}\n"
+            + f"Service Charge (10%): ${service_charge:.2f}\n"
+            + f"Total: ${total:.2f}"
+        )
+        self.order.clear()
+        return bill_text
+
+
+class RestaurantGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Restaurant Management System")
+        self.restaurant = Restaurant()
+
+        self.notebook = ttk.Notebook(root)
+        self.notebook.pack(fill="both", expand=True)
+
+        self.menu_tab = ttk.Frame(self.notebook)
+        self.order_tab = ttk.Frame(self.notebook)
+        self.bill_tab = ttk.Frame(self.notebook)
+
+        self.notebook.add(self.menu_tab, text="Manage Menu")
+        self.notebook.add(self.order_tab, text="Take Order")
+        self.notebook.add(self.bill_tab, text="Calculate Bill")
+
+        self.setup_menu_tab()
+        self.setup_order_tab()
+        self.setup_bill_tab()
+
+    def setup_menu_tab(self):
+        tk.Label(self.menu_tab, text="Add Item:").grid(row=0, column=0, padx=10, pady=5)
+        self.add_item_name_entry = tk.Entry(self.menu_tab)
+        self.add_item_name_entry.grid(row=0, column=1, padx=10, pady=5)
+        self.add_item_price_entry = tk.Entry(self.menu_tab)
+        self.add_item_price_entry.grid(row=0, column=2, padx=10, pady=5)
+        tk.Button(self.menu_tab, text="Add", command=self.add_item).grid(row=0, column=3, padx=10, pady=5)
+
+        tk.Label(self.menu_tab, text="Remove Item:").grid(row=1, column=0, padx=10, pady=5)
+        self.remove_item_name_entry = tk.Entry(self.menu_tab)
+        self.remove_item_name_entry.grid(row=1, column=1, padx=10, pady=5)
+        tk.Button(self.menu_tab, text="Remove", command=self.remove_item).grid(row=1, column=2, padx=10, pady=5)
+
+        tk.Label(self.menu_tab, text="Update Item Price:").grid(row=2, column=0, padx=10, pady=5)
+        self.update_item_name_entry = tk.Entry(self.menu_tab)
+        self.update_item_name_entry.grid(row=2, column=1, padx=10, pady=5)
+        self.update_item_price_entry = tk.Entry(self.menu_tab)
+        self.update_item_price_entry.grid(row=2, column=2, padx=10, pady=5)
+        tk.Button(self.menu_tab, text="Update", command=self.update_item_price).grid(row=2, column=3, padx=10, pady=5)
+
+        tk.Button(self.menu_tab, text="View Menu", command=self.view_menu).grid(row=3, column=0, padx=10, pady=5)
+        self.menu_display = tk.Text(self.menu_tab, height=10, width=50)
+        self.menu_display.grid(row=4, column=0, columnspan=4, padx=10, pady=5)
+
+    def setup_order_tab(self):
+        tk.Label(self.order_tab, text="Select Item:").grid(row=0, column=0, padx=10, pady=5)
+        self.item_var = tk.StringVar()
+        self.item_dropdown = ttk.Combobox(self.order_tab, textvariable=self.item_var, state="readonly")
+        self.item_dropdown.grid(row=0, column=1, padx=10, pady=5)
+
+        tk.Label(self.order_tab, text="Quantity:").grid(row=1, column=0, padx=10, pady=5)
+        self.quantity_entry = tk.Entry(self.order_tab)
+        self.quantity_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        tk.Button(self.order_tab, text="Add to Order", command=self.take_order).grid(row=2, column=0, columnspan=2, pady=5)
+
+        self.order_tree = ttk.Treeview(self.order_tab, columns=("Item", "Quantity"), show="headings")
+        self.order_tree.heading("Item", text="Item")
+        self.order_tree.heading("Quantity", text="Quantity")
+        self.order_tree.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+
+        self.update_item_dropdown()
+
+    def setup_bill_tab(self):
+        tk.Button(self.bill_tab, text="Calculate Bill", command=self.calculate_bill).pack(pady=10)
+        self.bill_display = tk.Text(self.bill_tab, height=10, width=50)
+        self.bill_display.pack()
+
+    def update_item_dropdown(self):
+        self.item_dropdown["values"] = list(self.restaurant.menu.keys())
+
+    def add_item(self):
+        item = self.add_item_name_entry.get().strip()
+        price = self.add_item_price_entry.get().strip()
+        try:
+            messagebox.showinfo("Result", self.restaurant.add_item(item, float(price)))
+            self.update_item_dropdown()
+        except ValueError:
+            messagebox.showerror("Error", "Invalid price")
+
+    def remove_item(self):
+        messagebox.showinfo("Result", self.restaurant.remove_item(self.remove_item_name_entry.get().strip()))
+        self.update_item_dropdown()
+
+    def view_menu(self):
+        self.menu_display.delete(1.0, tk.END)
+        self.menu_display.insert(tk.END, self.restaurant.view_menu())
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    RestaurantGUI(root)
+    root.mainloop()
